@@ -2,4 +2,9 @@
 <resources>
     <color name="app_name_light">#333333</color>
     <color name="app_name_dark">#EBEBEB</color>
+
+    <color name="refresh_1">#ff3871ff</color>
+    <color name="refresh_2">#ffffef42</color>
+    <color name="refresh_3">#ff4aff6f</color>
+    <color name="refresh_4">#ffff615d</color>
 </resources>

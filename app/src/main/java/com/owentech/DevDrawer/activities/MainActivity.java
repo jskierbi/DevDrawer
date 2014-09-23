@@ -1,6 +1,5 @@
 package com.owentech.DevDrawer.activities;
 
-import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
 import android.content.Intent;
@@ -8,61 +7,63 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.widget.SwipeRefreshLayout;
+import android.support.v7.app.ActionBarActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AutoCompleteTextView;
-import android.widget.ImageView;
-import android.widget.ListView;
-import android.widget.RemoteViews;
-import android.widget.Toast;
-
+import android.widget.*;
+import com.jskierbi.network.RequestPackageList;
+import com.jskierbi.network.StringList;
+import com.jskierbi.robospice.JSSpiceService;
+import com.octo.android.robospice.SpiceManager;
+import com.octo.android.robospice.persistence.DurationInMillis;
+import com.octo.android.robospice.persistence.exception.SpiceException;
+import com.octo.android.robospice.request.listener.RequestListener;
 import com.owentech.DevDrawer.R;
 import com.owentech.DevDrawer.adapters.FilterListAdapter;
-import com.owentech.DevDrawer.appwidget.DDWidgetProvider;
 import com.owentech.DevDrawer.adapters.PartialMatchAdapter;
+import com.owentech.DevDrawer.appwidget.DDWidgetProvider;
 import com.owentech.DevDrawer.utils.AddAllAppsAsync;
 import com.owentech.DevDrawer.utils.Constants;
 import com.owentech.DevDrawer.utils.Database;
 
 import java.text.Collator;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-public class MainActivity extends Activity implements TextWatcher
-{
+public class MainActivity extends ActionBarActivity implements TextWatcher, RequestListener<StringList> {
 
 	Database database;
 
 	ImageView addButton;
-	AutoCompleteTextView addPackageAutoComplete;
+	TextView addPackageAutoComplete;
 	FilterListAdapter lviewAdapter;
 	ListView listView;
 	PartialMatchAdapter partialMatchAdapter;
 
 	List<String> appPackages;
 
-    @Override
-	public void onCreate(Bundle state)
-	{
+	SpiceManager spiceManager;
+	SwipeRefreshLayout refreshLayout;
+
+	@Override
+	public void onCreate(Bundle state) {
 		super.onCreate(state);
 
 		setContentView(R.layout.main);
 
+		spiceManager = new SpiceManager(JSSpiceService.class);
+
 		// Set up ActionBar to use custom view (Robot Light font)
-		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB)
-		{
-			getActionBar().setDisplayShowTitleEnabled(false);
+		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB) {
+			getSupportActionBar().setDisplayShowTitleEnabled(false);
 			LayoutInflater inflater = LayoutInflater.from(this);
 			View customView = inflater.inflate(R.layout.custom_ab_title, null);
-			getActionBar().setCustomView(customView);
-			getActionBar().setDisplayShowCustomEnabled(true);
+			getSupportActionBar().setCustomView(customView);
+			getSupportActionBar().setDisplayShowCustomEnabled(true);
 		}
 
 		// Create the database tables
@@ -71,79 +72,98 @@ public class MainActivity extends Activity implements TextWatcher
 
 		// Setup view components
 		addButton = (ImageView) findViewById(R.id.addButton);
-		addPackageAutoComplete = (AutoCompleteTextView) findViewById(R.id.addPackageEditText);
+		addPackageAutoComplete = (TextView) findViewById(R.id.addPackageEditText);
 		listView = (ListView) findViewById(R.id.packagesListView);
 
 		appPackages = getExistingPackages();
 
-		partialMatchAdapter = new PartialMatchAdapter(this, appPackages);
-		addPackageAutoComplete.setAdapter(partialMatchAdapter);
-		addPackageAutoComplete.addTextChangedListener(this);
+		// Removed autocomplete
+//		partialMatchAdapter = new PartialMatchAdapter(this, appPackages);
+//		addPackageAutoComplete.setAdapter(partialMatchAdapter);
+//		addPackageAutoComplete.addTextChangedListener(this);
+
+		// Setup swipe refresh
+		refreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh);
+		refreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+			@Override public void onRefresh() {
+				spiceManager.execute(new RequestPackageList(), "package-list", DurationInMillis.ALWAYS_EXPIRED, MainActivity.this);
+			}
+		});
+		refreshLayout.setColorSchemeResources(
+				R.color.refresh_1,
+				R.color.refresh_2,
+				R.color.refresh_3,
+				R.color.refresh_4);
 
 		// Update the ListView from the database
 		updateListView();
 
-		addButton.setOnClickListener(new View.OnClickListener()
-		{
+		addButton.setOnClickListener(new View.OnClickListener() {
 			@Override
-			public void onClick(View view)
-			{
+			public void onClick(View view) {
 
-				if(addPackageAutoComplete.getText().length() != 0) // Check something entered
+				if (addPackageAutoComplete.getText().length() != 0) // Check something entered
 				{
 					// Check filter doesn't exist
-					if(!database.doesFilterExist(addPackageAutoComplete.getText().toString()))
-					{
+					if (!database.doesFilterExist(addPackageAutoComplete.getText().toString())) {
 						// Add the filter to the database
 						database.addFilterToDatabase(addPackageAutoComplete.getText().toString());
 
 						// Check existing apps and add to installed apps table if they match new filter
-                        new AddAllAppsAsync(getApplicationContext(), addPackageAutoComplete.getText().toString()).execute();
+						new AddAllAppsAsync(getApplicationContext(), addPackageAutoComplete.getText().toString()).execute();
 
 						addPackageAutoComplete.setText("");
 						updateListView();
 
-					}
-					else
-					{
+					} else {
 						Toast.makeText(getApplicationContext(), "Filter already exists", Toast.LENGTH_SHORT).show();
 					}
 				}
 
 			}
 		});
-
-
 	}
 
-    @Override
-    public void onBackPressed() {
+	@Override protected void onStart() {
+		super.onStart();
+		spiceManager.start(this);
+		// Auto refresh on start
+		spiceManager.execute(new RequestPackageList(), "package-list", DurationInMillis.ALWAYS_EXPIRED, this);
+		refreshLayout.setRefreshing(true);
+	}
 
-        Intent intent = getIntent();
-        Bundle extras = intent.getExtras();
-        int appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
-        if (extras != null) {
-            appWidgetId = extras.getInt(
-                    AppWidgetManager.EXTRA_APPWIDGET_ID,
-                    AppWidgetManager.INVALID_APPWIDGET_ID);
-        }
+	@Override protected void onStop() {
+		super.onStop();
+		spiceManager.shouldStop();
+	}
 
-        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
-            RemoteViews widget = DDWidgetProvider.getRemoteViews(this,appWidgetId);
-            appWidgetManager.updateAppWidget(appWidgetId, widget);
-            Intent resultValue = new Intent();
-            resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            setResult(RESULT_OK, resultValue);
-            finish();
-        }
+	@Override
+	public void onBackPressed() {
 
-        super.onBackPressed();
-    }
+		Intent intent = getIntent();
+		Bundle extras = intent.getExtras();
+		int appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
+		if (extras != null) {
+			appWidgetId = extras.getInt(
+					AppWidgetManager.EXTRA_APPWIDGET_ID,
+					AppWidgetManager.INVALID_APPWIDGET_ID);
+		}
 
-    // Method to re-populate the ListView
-	public void updateListView()
-	{
+		if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+			AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
+			RemoteViews widget = DDWidgetProvider.getRemoteViews(this, appWidgetId);
+			appWidgetManager.updateAppWidget(appWidgetId, widget);
+			Intent resultValue = new Intent();
+			resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+			setResult(RESULT_OK, resultValue);
+			finish();
+		}
+
+		super.onBackPressed();
+	}
+
+	// Method to re-populate the ListView
+	public void updateListView() {
 		lviewAdapter = null;
 		lviewAdapter = new FilterListAdapter(this, database.getAllFiltersInDatabase());
 		listView.setAdapter(lviewAdapter);
@@ -151,13 +171,11 @@ public class MainActivity extends Activity implements TextWatcher
 	}
 
 	@Override
-	protected void onActivityResult(int requestCode, int resultCode, Intent data)
-	{
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
 
 		// Catch the return from the EditDialog
-		if(resultCode == Constants.EDIT_DIALOG_CHANGE)
-		{
+		if (resultCode == Constants.EDIT_DIALOG_CHANGE) {
 			Bundle bundle = data.getExtras();
 
 			Database database = new Database(this);
@@ -167,16 +185,12 @@ public class MainActivity extends Activity implements TextWatcher
 	}
 
 	@Override
-	public boolean onCreateOptionsMenu(Menu menu)
-	{
-		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-		{
+	public boolean onCreateOptionsMenu(Menu menu) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
 			menu.add(0, Constants.MENU_SHORTCUT, 0, "Create Legacy Shortcut").setShowAsAction(MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
 			menu.add(0, Constants.MENU_SETTINGS, 0, "Settings").setIcon(R.drawable.ic_action_settings_white).setShowAsAction(MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
 			//menu.add(0, Constants.MENU_LOCALE_SWITCHER, 0, "Locale Switcher").setIcon(R.drawable.ic_action_globe).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-		}
-		else
-		{
+		} else {
 			menu.add(0, Constants.MENU_SHORTCUT, 0, "Create Shortcut");
 			menu.add(0, Constants.MENU_SETTINGS, 0, "Settings");
 			//menu.add(0, Constants.MENU_LOCALE_SWITCHER, 0, "Locale Switcher");
@@ -184,27 +198,21 @@ public class MainActivity extends Activity implements TextWatcher
 		return true;
 	}
 
-	@Override
-	public boolean onMenuItemSelected(int featureId, MenuItem item)
-	{
-		switch(item.getItemId())
-		{
-			case Constants.MENU_SHORTCUT:
-			{
-				addShortcut(this);
-				break;
-			}
-			case Constants.MENU_SETTINGS:
-			{
-				startActivity(new Intent(MainActivity.this, PrefActivity.class));
-				break;
-			}
-			case Constants.MENU_LOCALE_SWITCHER:
-			{
+	@Override public boolean onOptionsItemSelected(MenuItem item) {
+		switch (item.getItemId()) {
+		case Constants.MENU_SHORTCUT: {
+			addShortcut(this);
+			break;
+		}
+		case Constants.MENU_SETTINGS: {
+			startActivity(new Intent(MainActivity.this, PrefActivity.class));
+			break;
+		}
+		case Constants.MENU_LOCALE_SWITCHER: {
 
-				startActivity(new Intent(this, LocaleSwitcher.class));
-				break;
-			}
+			startActivity(new Intent(this, LocaleSwitcher.class));
+			break;
+		}
 		}
 		return false;
 	}
@@ -223,59 +231,65 @@ public class MainActivity extends Activity implements TextWatcher
 		context.sendBroadcast(intent);
 	}
 
-	@Override
-	protected void onStop()
-	{
-		super.onStop();
-        //TODO is this really needed? It makes the prefActivity to close the app on backpress
-		// this is called to prevent a new app, back pressed, opening this activity
-		finish();
-	}
-
 	// Method to get all apps installed and return as List
-	List<String> getExistingPackages()
-	{
+	List<String> getExistingPackages() {
 		// get installed applications
 		PackageManager pm = this.getPackageManager();
 		Intent intent = new Intent(Intent.ACTION_MAIN, null);
 		intent.addCategory(Intent.CATEGORY_LAUNCHER);
-		List<ResolveInfo> list= pm.queryIntentActivities(intent,
+		List<ResolveInfo> list = pm.queryIntentActivities(intent,
 				PackageManager.PERMISSION_GRANTED);
 
-        Set<String> appSet = new HashSet<String>();
+		Set<String> appSet = new HashSet<String>();
 
 		for (ResolveInfo rInfo : list) {
-            String appName = rInfo.activityInfo.applicationInfo.packageName.toString();
-            appSet.add(appName);
-            while (appName.length() > 0) {
-                int lastIndex = appName.lastIndexOf(".");
-                if (lastIndex > 0) {
-                    appName = appName.substring(0,lastIndex);
-                    appSet.add(appName+".*");
-                } else {
-                    appName = "";
-                }
-            }
+			String appName = rInfo.activityInfo.applicationInfo.packageName.toString();
+			appSet.add(appName);
+			while (appName.length() > 0) {
+				int lastIndex = appName.lastIndexOf(".");
+				if (lastIndex > 0) {
+					appName = appName.substring(0, lastIndex);
+					appSet.add(appName + ".*");
+				} else {
+					appName = "";
+				}
+			}
 		}
 
-        Collator collator = Collator.getInstance();
-        ArrayList<String> appList = new ArrayList<String>(appSet);
-        Collections.sort(appList, collator);
+		Collator collator = Collator.getInstance();
+		ArrayList<String> appList = new ArrayList<String>(appSet);
+		Collections.sort(appList, collator);
 		return appList;
 	}
 
 	@Override
-	public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3)
-	{}
+	public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3) {}
 
 	@Override
-	public void onTextChanged(CharSequence charSequence, int i, int i2, int i3)
-	{}
+	public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {}
 
 	@Override
-	public void afterTextChanged(Editable editable)
-	{
+	public void afterTextChanged(Editable editable) {
 		partialMatchAdapter.getFilter().filter(editable.toString());
 	}
 
+	@Override public void onRequestFailure(SpiceException spiceException) {
+		Toast.makeText(this, "Network error, try again", Toast.LENGTH_SHORT);
+		refreshLayout.setRefreshing(false);
+	}
+
+	@Override public void onRequestSuccess(StringList strings) {
+		refreshLayout.setRefreshing(false);
+		boolean flgChanged = false;
+		for (String packageName : strings) {
+			if (!database.doesFilterExist(packageName)) {
+				flgChanged = true;
+				database.addFilterToDatabase(packageName);
+				new AddAllAppsAsync(getApplicationContext(), packageName).execute();
+			}
+		}
+		if (flgChanged) {
+			updateListView();
+		}
+	}
 }
