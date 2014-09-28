@@ -7,7 +7,7 @@
             android:defaultValue="false"
             android:key="flgEnableSync"
             android:title="Enable synchronization"
-            android:summary="Download package list "/>
+            android:summary="Download package list from URL"/>
         <EditTextPreference
             android:hint="sync URL"
             android:key="syncUrl"

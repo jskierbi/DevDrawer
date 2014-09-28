@@ -12,9 +12,6 @@ public class DrawerApplication extends Application {
 		super.onCreate();
 
 		// Custom package loading
-		PreferenceManager.getDefaultSharedPreferences(this).edit()
-				.putString("syncUrl","https://www.dropbox.com/s/wbjufg8vqutchsa/package_names?dl=1")
-				.putBoolean("flgEnableSync", true)
-				.commit();
+
 	}
 }
