@@ -17,61 +17,59 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.preference.PreferenceManager;
 import android.widget.RemoteViews;
-import com.owentech.DevDrawer.activities.ClickHandlingActivity;
 import com.owentech.DevDrawer.R;
+import com.owentech.DevDrawer.activities.ClickHandlingActivity;
+import com.owentech.DevDrawer.activities.MainActivity;
 
 public class DDWidgetProvider extends AppWidgetProvider {
 
-    public static String PACKAGE_STRING = "default.package";
+	public static String PACKAGE_STRING = "default.package";
 
-    @Override
-    public void onUpdate(Context context, AppWidgetManager appWidgetManager,
-                         int[] appWidgetIds)
-    {
+	@Override
+	public void onUpdate(Context context, AppWidgetManager appWidgetManager,
+	                     int[] appWidgetIds) {
 
-        for (int i=0; i<appWidgetIds.length; i++)
-        {
-            RemoteViews widget = getRemoteViews(context, appWidgetIds[i]);
+		for (int i = 0; i < appWidgetIds.length; i++) {
+			RemoteViews widget = getRemoteViews(context, appWidgetIds[i]);
 
 
-            appWidgetManager.updateAppWidget(appWidgetIds[i], widget);
+			appWidgetManager.updateAppWidget(appWidgetIds[i], widget);
 
-        }
+		}
 
-        super.onUpdate(context, appWidgetManager, appWidgetIds);
+		super.onUpdate(context, appWidgetManager, appWidgetIds);
 
-    }
+	}
 
-    public static RemoteViews getRemoteViews(Context context, int appWidgetId) {
-        // Setup the widget, and data source / adapter
-        Intent svcIntent=new Intent(context, DDWidgetService.class);
+	public static RemoteViews getRemoteViews(Context context, int appWidgetId) {
+		// Setup the widget, and data source / adapter
+		Intent svcIntent = new Intent(context, DDWidgetService.class);
 
-        svcIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-        svcIntent.setData(Uri.parse(svcIntent.toUri(Intent.URI_INTENT_SCHEME)));
+		svcIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+		svcIntent.setData(Uri.parse(svcIntent.toUri(Intent.URI_INTENT_SCHEME)));
 
-        RemoteViews widget;
+		RemoteViews widget;
 
-        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+		SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
 
-        if(sp.getString("theme", "Light").equals("Light"))
-        {
-            widget = new RemoteViews(context.getPackageName(), R.layout.widget_layout);
-        }
-        else
-        {
-            widget = new RemoteViews(context.getPackageName(), R.layout.widget_layout_dark);
-        }
+		if (sp.getString("theme", "Light").equals("Light")) {
+			widget = new RemoteViews(context.getPackageName(), R.layout.widget_layout);
+		} else {
+			widget = new RemoteViews(context.getPackageName(), R.layout.widget_layout_dark);
+		}
 
-        widget.setRemoteAdapter(R.id.listView, svcIntent);
+		widget.setRemoteAdapter(R.id.listView, svcIntent);
+		widget.setOnClickPendingIntent(R.id.btn_refresh,
+				PendingIntent.getActivity(context, 0, new Intent(context, MainActivity.class), 0));
 
-        Intent clickIntent=new Intent(context, ClickHandlingActivity.class);
-        PendingIntent clickPI=PendingIntent
-                .getActivity(context, 0,
-                        clickIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT);
+		Intent clickIntent = new Intent(context, ClickHandlingActivity.class);
+		PendingIntent clickPI = PendingIntent
+				.getActivity(context, 0,
+						clickIntent,
+						PendingIntent.FLAG_UPDATE_CURRENT);
 
-        widget.setPendingIntentTemplate(R.id.listView, clickPI);
-        return widget;
-    }
+		widget.setPendingIntentTemplate(R.id.listView, clickPI);
+		return widget;
+	}
 
 }
