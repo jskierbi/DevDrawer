@@ -31,10 +31,7 @@ public class DDWidgetProvider extends AppWidgetProvider {
 
 		for (int i = 0; i < appWidgetIds.length; i++) {
 			RemoteViews widget = getRemoteViews(context, appWidgetIds[i]);
-
-
 			appWidgetManager.updateAppWidget(appWidgetIds[i], widget);
-
 		}
 
 		super.onUpdate(context, appWidgetManager, appWidgetIds);

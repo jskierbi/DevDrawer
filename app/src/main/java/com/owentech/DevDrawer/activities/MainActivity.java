@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarActivity;
 import android.text.Editable;
@@ -95,6 +96,10 @@ public class MainActivity extends ActionBarActivity implements TextWatcher, Requ
 				R.color.refresh_3,
 				R.color.refresh_4);
 
+		refreshLayout.setEnabled(PreferenceManager
+				.getDefaultSharedPreferences(this)
+				.getBoolean("flgEnableSync", false));
+
 		// Update the ListView from the database
 		updateListView();
 
@@ -127,9 +132,13 @@ public class MainActivity extends ActionBarActivity implements TextWatcher, Requ
 	@Override protected void onStart() {
 		super.onStart();
 		spiceManager.start(this);
-		// Auto refresh on start
-		spiceManager.execute(new RequestPackageList(), "package-list", DurationInMillis.ALWAYS_EXPIRED, this);
-		refreshLayout.setRefreshing(true);
+		// Auto refresh on start (if enabled)
+		if (PreferenceManager
+				.getDefaultSharedPreferences(this)
+				.getBoolean("flgEnableSync", false)) {
+			spiceManager.execute(new RequestPackageList(), "package-list", DurationInMillis.ALWAYS_EXPIRED, this);
+			refreshLayout.setRefreshing(true);
+		}
 	}
 
 	@Override protected void onStop() {
