@@ -2,10 +2,12 @@ package com.owentech.DevDrawer.activities;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.view.View;
 import android.view.Window;
 import android.widget.ListView;
 import com.owentech.DevDrawer.R;
@@ -39,6 +41,12 @@ public class LegacyDialog extends Activity {
 
 		LegacyListAdapter listAdapter = new LegacyListAdapter(this);
 		legacyListView.setAdapter(listAdapter);
+
+		findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
+			@Override public void onClick(View v) {
+				startActivity(new Intent(LegacyDialog.this, MainActivity.class));
+			}
+		});
 	}
 
 	@TargetApi(Build.VERSION_CODES.JELLY_BEAN)
