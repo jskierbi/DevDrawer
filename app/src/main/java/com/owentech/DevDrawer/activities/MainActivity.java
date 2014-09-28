@@ -87,7 +87,14 @@ public class MainActivity extends ActionBarActivity implements TextWatcher, Requ
 		refreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh);
 		refreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
 			@Override public void onRefresh() {
-				spiceManager.execute(new RequestPackageList(), "package-list", DurationInMillis.ALWAYS_EXPIRED, MainActivity.this);
+
+				String url = PreferenceManager
+						.getDefaultSharedPreferences(MainActivity.this)
+						.getString("syncUrl", "no url!");
+				spiceManager.execute(new RequestPackageList(url),
+						"package-list",
+						DurationInMillis.ALWAYS_EXPIRED,
+						MainActivity.this);
 			}
 		});
 		refreshLayout.setColorSchemeResources(
@@ -136,7 +143,14 @@ public class MainActivity extends ActionBarActivity implements TextWatcher, Requ
 		if (PreferenceManager
 				.getDefaultSharedPreferences(this)
 				.getBoolean("flgEnableSync", false)) {
-			spiceManager.execute(new RequestPackageList(), "package-list", DurationInMillis.ALWAYS_EXPIRED, this);
+			String url = PreferenceManager
+					.getDefaultSharedPreferences(this)
+					.getString("syncUrl", "no url!");
+			spiceManager.execute(
+					new RequestPackageList(url),
+					"package-list",
+					DurationInMillis.ALWAYS_EXPIRED,
+					this);
 			refreshLayout.setRefreshing(true);
 		}
 	}
@@ -283,22 +297,26 @@ public class MainActivity extends ActionBarActivity implements TextWatcher, Requ
 	}
 
 	@Override public void onRequestFailure(SpiceException spiceException) {
-		Toast.makeText(this, "Network error, try again", Toast.LENGTH_SHORT);
+		Toast.makeText(this, "Network error, try again", Toast.LENGTH_SHORT).show();
 		refreshLayout.setRefreshing(false);
 	}
 
 	@Override public void onRequestSuccess(StringList strings) {
-		refreshLayout.setRefreshing(false);
-		boolean flgChanged = false;
-		for (String packageName : strings) {
-			if (!database.doesFilterExist(packageName)) {
-				flgChanged = true;
-				database.addFilterToDatabase(packageName);
-				new AddAllAppsAsync(getApplicationContext(), packageName).execute();
+		try {
+			refreshLayout.setRefreshing(false);
+			boolean flgChanged = false;
+			for (String packageName : strings) {
+				if (!database.doesFilterExist(packageName)) {
+					flgChanged = true;
+					database.addFilterToDatabase(packageName);
+					new AddAllAppsAsync(getApplicationContext(), packageName).execute();
+				}
 			}
-		}
-		if (flgChanged) {
-			updateListView();
+			if (flgChanged) {
+				updateListView();
+			}
+		} catch (Exception ex) {
+			Toast.makeText(this, "Network response error!", Toast.LENGTH_SHORT).show();
 		}
 	}
 }

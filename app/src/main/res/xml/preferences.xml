@@ -12,7 +12,6 @@
             android:hint="sync URL"
             android:key="syncUrl"
             android:title="URL to package list (json)" />
-
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Activity Launcher">

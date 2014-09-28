@@ -19,6 +19,7 @@
 
     <application
         android:icon="@drawable/ic_launcher"
+        android:name=".activities.DrawerApplication"
         android:label="@string/app_name"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
         <!--Theme.Holo.Light.DarkActionBar-->
